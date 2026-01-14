@@ -81,8 +81,8 @@ class DaveSession {
     func processWelcome(welcome: Data, knownUserIds: [String]) -> Welcome? {
         var knownUserIds = knownUserIds
         let result = knownUserIds.withUnsafeMutableBytes { knownUserIds in
-            let knownUserIds = knownUserIds.bindMemory(to: UnsafePointer<CChar>?.self)
-            return welcome.withUnsafeBytes { welcome in
+            welcome.withUnsafeBytes { welcome in
+                let knownUserIds = knownUserIds.bindMemory(to: UnsafePointer<CChar>?.self)
                 let welcome = welcome.bindMemory(to: UInt8.self)
                 return daveSessionProcessWelcome(
                     self.sessionHandle,
