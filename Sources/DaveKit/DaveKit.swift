@@ -18,6 +18,7 @@ public actor DaveSessionManager {
     init(selfUserId: String) {
         session = DaveSession()
         encryptor = Encryptor()
+        encryptor.setPassthroughMode(enabled: true)
         self.selfUserId = selfUserId
     }
 
