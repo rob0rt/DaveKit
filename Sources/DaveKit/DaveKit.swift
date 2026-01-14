@@ -1,11 +1,20 @@
 import libdave
 import Foundation
+import Logging
 
 public actor DaveSessionManager {
     // MARK: - Constants
+
     private static let INIT_TRANSITION_ID: UInt16 = 0
     private static let DISABLED_PROTOCOL_VERSION = 0
     private static let MLS_NEW_GROUP_EXPECTED_EPOCH = "1"
+
+    // Static property initializer to set up logging only once, even across multiple instances
+    private static let setupLogging: Void = {
+        daveSetLogSinkCallback(logSyncCallback)
+    }()
+
+    // MARK: - Properties
 
     private let selfUserId: String
     private let groupId: UInt64
@@ -19,6 +28,8 @@ public actor DaveSessionManager {
 
     private weak let delegate: (any DaveSessionDelegate)?
 
+    // MARK: - Initializer
+
     init(
         selfUserId: String,
         groupId: UInt64,
@@ -27,6 +38,8 @@ public actor DaveSessionManager {
         self.selfUserId = selfUserId
         self.groupId = groupId
         self.delegate = delegate
+
+        _ = Self.setupLogging
 
         session = DaveSession()
         encryptor = Encryptor()

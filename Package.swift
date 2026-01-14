@@ -10,10 +10,16 @@ let package = Package(
             targets: ["DaveKit"]
         ),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-log", from: "1.9.0")
+    ],
     targets: [
         .target(
             name: "DaveKit",
-            dependencies: [.target(name: "libdave")]
+            dependencies: [
+                .target(name: "libdave"),
+                .product(name: "Logging", package: "swift-log"),
+            ]
         ),
 
         .target(
