@@ -54,17 +54,18 @@ class DaveSession {
         var welcomeData: UnsafeMutablePointer<UInt8>?
         var welcomeDataLength = 0
         var knownUserIds = knownUserIds
-        knownUserIds.withUnsafeMutableBytes { knownUserIdsBuffer in
+        let knownUserIdCount = knownUserIds.count
+        knownUserIds.withUnsafeMutableBytes { knownUserIds in
             return proposals.withUnsafeBytes { proposals in
                 let proposals = proposals.bindMemory(to: UInt8.self)
-                let knownUserIdsBuffer = knownUserIdsBuffer.bindMemory(
+                let knownUserIds = knownUserIds.bindMemory(
                     to: UnsafePointer<CChar>?.self)
                 return daveSessionProcessProposals(
                     self.sessionHandle,
                     proposals.baseAddress!,
                     proposals.count,
-                    knownUserIdsBuffer.baseAddress!,
-                    knownUserIds.count,
+                    knownUserIds.baseAddress!,
+                    knownUserIdCount,
                     &welcomeData,
                     &welcomeDataLength,
                 )

@@ -19,6 +19,9 @@ let package = Package(
             dependencies: [
                 .target(name: "libdave"),
                 .product(name: "Logging", package: "swift-log"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx)
             ]
         ),
 
@@ -78,6 +81,9 @@ let package = Package(
             path: "Sources/CMLS/mlspp/lib/hpke",
             exclude: ["test"],
             sources: ["src"],
+            cxxSettings: [
+                .define("WITH_OPENSSL3"),
+            ],
         ),
 
         .target(
@@ -107,7 +113,8 @@ let package = Package(
 
         .testTarget(
             name: "DaveKitTests",
-            dependencies: ["DaveKit"]
+            dependencies: ["DaveKit"],
         ),
-    ]
+    ],
+    cxxLanguageStandard: .cxx17,
 )
