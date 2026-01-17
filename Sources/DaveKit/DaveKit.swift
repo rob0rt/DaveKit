@@ -88,14 +88,14 @@ public actor DaveSessionManager {
     // MARK: - Incoming Voice Gateway Requests
 
     // Opcode SELECT_PROTOCOL_ACK (1)
-    public func selectProtocol(protocolVersion: UInt16) {
-        if (protocolVersion > 0) {
-            prepareEpoch(
+    public func selectProtocol(protocolVersion: UInt16) async {
+        if (protocolVersion > Self.DISABLED_PROTOCOL_VERSION) {
+            await prepareEpoch(
                 epoch: Self.MLS_NEW_GROUP_EXPECTED_EPOCH,
                 protocolVersion: protocolVersion,
             )
         } else {
-            prepareTransition(
+            await prepareTransition(
                 transitionId: Self.INIT_TRANSITION_ID,
                 protocolVersion: protocolVersion,
             )
@@ -104,7 +104,7 @@ public actor DaveSessionManager {
     }
 
     // Opcode DAVE_PROTOCOL_PREPARE_TRANSITION (21)
-    public func prepareTransition(transitionId: UInt16, protocolVersion: UInt16) {
+    public func prepareTransition(transitionId: UInt16, protocolVersion: UInt16) async {
         for userId in decryptors.keys {
             setupKeyRatchetForUser(userId: userId, protocolVersion: protocolVersion)
         }
@@ -118,7 +118,7 @@ public actor DaveSessionManager {
         lastPreparedTransitionVersion = transitionId
 
         if transitionId != Self.INIT_TRANSITION_ID {
-            delegate?.readyForTransition(transitionId: transitionId)
+            await delegate?.readyForTransition(transitionId: transitionId)
         }
     }
 
@@ -136,18 +136,14 @@ public actor DaveSessionManager {
     }
 
     // Opcode DAVE_PROTOCOL_PREPARE_EPOCH (24)
-    public func prepareEpoch(epoch: String, protocolVersion: UInt16) {
+    public func prepareEpoch(epoch: String, protocolVersion: UInt16) async {
         guard epoch == Self.MLS_NEW_GROUP_EXPECTED_EPOCH else {
             return
         }
 
-        for userId in decryptors.keys {
-            setupKeyRatchetForUser(userId: userId, protocolVersion: protocolVersion)
-        }
+        session.initialize(version: protocolVersion, groupId: groupId, selfUserId: selfUserId)
 
-        setupKeyRatchetForEncryptor(protocolVersion: protocolVersion)
-
-        delegate?.sendMLSKeyPackage(keyPackage: session.getKeyPackage())
+        await delegate?.mlsKeyPackage(keyPackage: session.getKeyPackage())
     }
 
     // Opcode MLS_EXTERNAL_SENDER_PACKAGE (25)
@@ -156,20 +152,20 @@ public actor DaveSessionManager {
     }
 
     // Opcode MLS_PROPOSALS (27)
-    public func mlsProposals(proposals: Data) {
+    public func mlsProposals(proposals: Data) async {
         let welcome = session.processProposals(proposals: proposals, knownUserIds: knownUserIds)
         if let welcome = welcome {
-            delegate?.sendMLSCommitWelcome(welcome: welcome)
+            await delegate?.mlsCommitWelcome(welcome: welcome)
         }
     }
 
     // Opcode MLS_PREPARE_COMMIT_TRANSITION (29)
-    public func mlsPrepareCommitTransition(transitionId: UInt16, commit: Data) {
+    public func mlsPrepareCommitTransition(transitionId: UInt16, commit: Data) async {
         let commit = session.processCommit(commit: commit)
 
-        guard let commit else {
-            delegate?.mlsInvalidCommitWelcome(transitionId: transitionId)
-            selectProtocol(protocolVersion: session.getProtocolVersion())
+        guard let commit, !commit.isFailed else {
+            await delegate?.mlsInvalidCommitWelcome(transitionId: transitionId)
+            await selectProtocol(protocolVersion: session.getProtocolVersion())
             return
         }
 
@@ -177,22 +173,22 @@ public actor DaveSessionManager {
             return
         }
 
-        prepareTransition(transitionId: transitionId, protocolVersion: session.getProtocolVersion())
+        await prepareTransition(transitionId: transitionId, protocolVersion: session.getProtocolVersion())
     }
 
     // Opcode MLS_WELCOME (30)
-    public func mlsWelcome(transitionId: UInt16, welcome: Data) {
+    public func mlsWelcome(transitionId: UInt16, welcome: Data) async {
         let welcome = session.processWelcome(
             welcome: welcome,
             knownUserIds: knownUserIds,
         )
         guard welcome != nil else {
-            delegate?.mlsInvalidCommitWelcome(transitionId: transitionId)
-            delegate?.sendMLSKeyPackage(keyPackage: session.getKeyPackage())
+            await delegate?.mlsInvalidCommitWelcome(transitionId: transitionId)
+            await delegate?.mlsKeyPackage(keyPackage: session.getKeyPackage())
             return
         }
 
-        prepareTransition(
+        await prepareTransition(
             transitionId: transitionId,
             protocolVersion: session.getProtocolVersion(),
         )
@@ -202,23 +198,6 @@ public actor DaveSessionManager {
 
     private var knownUserIds: [String] {
         return Array(decryptors.keys) + [selfUserId]
-    }
-
-    private func initalizeSession(protocolVersion: UInt16) {
-        if (protocolVersion > 0) {
-            prepareEpoch(epoch: Self.MLS_NEW_GROUP_EXPECTED_EPOCH, protocolVersion: protocolVersion)
-        } else {
-            prepareTransition(
-                transitionId: Self.INIT_TRANSITION_ID,
-                protocolVersion: protocolVersion,
-            )
-            executeTransition(transitionId: Self.INIT_TRANSITION_ID)
-        }
-        session.initialize(
-            version: protocolVersion,
-            groupId: groupId,
-            selfUserId: selfUserId,
-        )
     }
 
     private func setupKeyRatchetForEncryptor(protocolVersion: UInt16) {
